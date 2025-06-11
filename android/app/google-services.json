@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "511029191228",
+    "project_id": "mbceteats",
+    "storage_bucket": "mbceteats.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:511029191228:android:9a688f4f172cd6cfcb9939",
+        "android_client_info": {
+          "package_name": "com.example.mbcet_eats"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACNI-N9230Y-Lqmwzxt_u-8FxkyDegvU4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
