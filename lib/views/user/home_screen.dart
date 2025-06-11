@@ -4,7 +4,9 @@ import '../../services/data_service.dart';
 import 'checkout_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String userId;
+
+  const HomeScreen({super.key, required this.userId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -33,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CheckoutScreen(cart: cartItems),
+        builder: (context) => CheckoutScreen(cart: cartItems, userId: widget.userId),
       ),
     );
   }

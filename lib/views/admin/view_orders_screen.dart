@@ -10,13 +10,19 @@ class ViewOrdersScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("View Orders")),
       body: StreamBuilder<List<UserOrder>>(
-        stream: DataService().getOrders(),
+        stream: DataService().getAllOrders(), // ✅ Use admin stream
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Text('Error loading orders.'));
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (snapshot.hasError) {
+            return const Center(child: Text('❌ Error loading orders.'));
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
           final orders = snapshot.data!;
-          if (orders.isEmpty) return const Center(child: Text('No orders placed yet.'));
+          if (orders.isEmpty) {
+            return const Center(child: Text('No orders placed yet.'));
+          }
 
           return ListView.builder(
             itemCount: orders.length,
@@ -26,7 +32,10 @@ class ViewOrdersScreen extends StatelessWidget {
                 margin: const EdgeInsets.all(8),
                 child: ListTile(
                   title: Text('User: ${order.username} | Token: ${order.token}'),
-                  subtitle: Text(order.items.map((e) => e.name).join(', ')),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: order.items.map((e) => Text('${e.name} - ₹${e.price}')).toList(),
+                  ),
                   trailing: ElevatedButton(
                     onPressed: () {
                       DataService().markOrderAsDone(order.id);

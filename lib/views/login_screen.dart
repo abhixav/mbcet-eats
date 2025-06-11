@@ -21,7 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (RegExp(r'^b\d{2}[a-z]{2}\d{4}$', caseSensitive: false).hasMatch(input)) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => HomeScreen(userId: input)),
       );
     } else {
       setState(() => _errorText = 'Enter valid College ID (e.g., b22cs1234)');
