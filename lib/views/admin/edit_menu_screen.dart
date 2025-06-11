@@ -13,13 +13,41 @@ class _EditMenuScreenState extends State<EditMenuScreen> {
   List<MenuItem> items = [];
   final nameController = TextEditingController();
   final priceController = TextEditingController();
+  int? editingIndex;
 
-  void addItem() {
-    if (nameController.text.isEmpty || priceController.text.isEmpty) return;
+  @override
+  void initState() {
+    super.initState();
+    DataService().getMenuItems().listen((menu) {
+      setState(() {
+        items = List.from(menu);
+      });
+    });
+  }
 
-    final item = MenuItem(name: nameController.text, price: int.parse(priceController.text));
+  void addOrUpdateItem() {
+    final name = nameController.text.trim();
+    final priceText = priceController.text.trim();
+
+    if (name.isEmpty || priceText.isEmpty) return;
+
+    final price = int.tryParse(priceText);
+    if (price == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ Invalid price")),
+      );
+      return;
+    }
+
+    final newItem = MenuItem(name: name, price: price);
+
     setState(() {
-      items.add(item);
+      if (editingIndex != null) {
+        items[editingIndex!] = newItem;
+        editingIndex = null;
+      } else {
+        items.add(newItem);
+      }
     });
 
     nameController.clear();
@@ -28,7 +56,24 @@ class _EditMenuScreenState extends State<EditMenuScreen> {
 
   void saveMenu() async {
     await DataService().updateMenu(items);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Menu updated.")));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("✅ Menu updated successfully")),
+    );
+  }
+
+  void deleteItem(int index) {
+    setState(() {
+      items.removeAt(index);
+    });
+  }
+
+  void editItem(int index) {
+    final item = items[index];
+    nameController.text = item.name;
+    priceController.text = item.price.toString();
+    setState(() {
+      editingIndex = index;
+    });
   }
 
   @override
@@ -49,21 +94,39 @@ class _EditMenuScreenState extends State<EditMenuScreen> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 10),
-            ElevatedButton(onPressed: addItem, child: const Text("Add Item")),
+            ElevatedButton(
+              onPressed: addOrUpdateItem,
+              child: Text(editingIndex == null ? "Add Item" : "Update Item"),
+            ),
             const SizedBox(height: 20),
             Expanded(
               child: ListView.builder(
                 itemCount: items.length,
-                itemBuilder: (_, i) => ListTile(
-                  title: Text(items[i].name),
-                  trailing: Text("₹${items[i].price}"),
+                itemBuilder: (_, index) => ListTile(
+                  title: Text(items[index].name),
+                  subtitle: Text("₹${items[index].price}"),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.orange),
+                        onPressed: () => editItem(index),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => deleteItem(index),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-            ElevatedButton(
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
               onPressed: saveMenu,
-              child: const Text("Save Menu"),
-            )
+              icon: const Icon(Icons.save),
+              label: const Text("Save Menu"),
+            ),
           ],
         ),
       ),

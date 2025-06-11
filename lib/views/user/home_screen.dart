@@ -20,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _addToCart(MenuItem item) {
     _menuLookup[item.name] = item;
     _cart[item.name] = (_cart[item.name] ?? 0) + 1;
-    _cartNotifier.value++; // Notify UI to refresh cart count
+    _cartNotifier.value++;
   }
 
   void _goToCheckout() {
@@ -48,8 +48,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Text('Today\'s Menu',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Today\'s Menu',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
           ),
           Expanded(
             child: StreamBuilder<List<MenuItem>>(
@@ -103,8 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ElevatedButton.icon(
                                   onPressed: () => _addToCart(item),
                                   icon: const Icon(Icons.add),
-                                  label:
-                                      Text(count == 0 ? 'Add' : 'Add ($count)'),
+                                  label: Text(count == 0 ? 'Add' : 'Add ($count)'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.teal,
                                     shape: RoundedRectangleBorder(
