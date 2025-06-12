@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'views/launch_screen.dart';
 
@@ -9,10 +8,6 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  // ✅ Anonymous sign-in for Firestore access
-  await FirebaseAuth.instance.signInAnonymously();
-  print("✅ Signed in anonymously as: ${FirebaseAuth.instance.currentUser?.uid}");
 
   runApp(const MyApp());
 }

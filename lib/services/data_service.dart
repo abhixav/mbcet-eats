@@ -11,12 +11,15 @@ class DataService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   /// 🔐 Places an order and sets default status as 'Pending'
-  Future<int> placeOrder(String username, List<MenuItem> items) async {
+  Future<int> placeOrder(List<MenuItem> items) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("User not logged in");
 
     final ordersSnapshot = await _db.collection('orders').get();
     final token = ordersSnapshot.size + 1;
+
+    final email = user.email ?? '';
+    final username = _extractNameFromEmail(email);
 
     final orderData = {
       'userId': user.uid,
@@ -24,7 +27,7 @@ class DataService {
       'token': token,
       'items': items.map((e) => {'name': e.name, 'price': e.price}).toList(),
       'timestamp': Timestamp.now(),
-      'status': 'Pending', // ✅ add status
+      'status': 'Pending',
     };
 
     await _db.collection('orders').add(orderData);
@@ -97,4 +100,23 @@ class DataService {
 
     await batch.commit();
   }
+
+  /// 👤 Extract nice name from email
+  String _extractNameFromEmail(String email) {
+    final localPart = email.split('@').first;
+    final parts = localPart.split('.');
+    if (parts.isEmpty) return 'Unknown';
+
+    final namePart = parts.first;
+    final nameMatches = RegExp(r'[a-zA-Z]+').allMatches(namePart).map((m) => m.group(0) ?? '').toList();
+
+    if (nameMatches.isEmpty) return namePart;
+
+    final first = nameMatches[0];
+    final last = nameMatches.length > 1 ? nameMatches[1][0].toUpperCase() : '';
+
+    return '${_capitalize(first)} $last';
+  }
+
+  String _capitalize(String str) => str.isEmpty ? str : '${str[0].toUpperCase()}${str.substring(1).toLowerCase()}';
 }

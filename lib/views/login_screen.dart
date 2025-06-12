@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'admin/admin_home_screen.dart';
 import 'user/home_screen.dart';
+import 'user/signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,21 +12,54 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _idController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _adminUserController = TextEditingController();
   final TextEditingController _adminPassController = TextEditingController();
+
   String? _errorText;
+  bool _isLoading = false;
 
-  void _login() {
-    final input = _idController.text.trim();
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-    if (RegExp(r'^b\d{2}[a-z]{2}\d{4}$', caseSensitive: false).hasMatch(input)) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen(userId: input)),
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _errorText = 'Please fill in all fields');
+      return;
+    }
+
+    setState(() {
+      _errorText = null;
+      _isLoading = true;
+    });
+
+    try {
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
-    } else {
-      setState(() => _errorText = 'Enter valid College ID (e.g., b22cs1234)');
+
+      if (credential.user != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => HomeScreen(userId: credential.user!.uid)),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        if (e.code == 'user-not-found') {
+          _errorText = '❌ No account found for that email.';
+        } else if (e.code == 'wrong-password') {
+          _errorText = '❌ Incorrect password.';
+        } else {
+          _errorText = 'Login failed: ${e.message}';
+        }
+      });
+    } catch (e) {
+      setState(() => _errorText = 'Unexpected error: ${e.toString()}');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -90,6 +125,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _goToSignup() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SignupScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,7 +140,6 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.restaurant_menu, size: 90, color: Colors.teal),
               const SizedBox(height: 16),
@@ -108,22 +149,34 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 24),
               TextField(
-                controller: _idController,
+                controller: _emailController,
                 decoration: InputDecoration(
-                  labelText: 'Enter College ID',
-                  hintText: 'e.g., b22cs1234',
-                  prefixIcon: const Icon(Icons.person),
+                  labelText: 'College Email',
+                  hintText: 'fullname.b22cs1234@mbcet.ac.in',
+                  prefixIcon: const Icon(Icons.email),
                   errorText: _errorText,
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: const Icon(Icons.lock),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: _login,
+                onPressed: _isLoading ? null : _login,
                 icon: const Icon(Icons.login),
-                label: const Text('Login'),
+                label: _isLoading ? const CircularProgressIndicator() : const Text('Login'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -140,6 +193,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _goToSignup,
+                child: const Text("Don't have an account? Sign Up"),
               ),
             ],
           ),

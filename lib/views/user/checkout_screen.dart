@@ -164,7 +164,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ? null
                   : () async {
                       final token = await DataService().placeOrder(
-                        widget.userId,
                         cart.entries.expand((e) => List.filled(e.value, e.key)).toList(),
                       );
                       Navigator.pushReplacement(
