@@ -23,6 +23,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _cartNotifier.value++;
   }
 
+  void _removeFromCart(MenuItem item) {
+    if (_cart.containsKey(item.name)) {
+      if (_cart[item.name]! > 1) {
+        _cart[item.name] = _cart[item.name]! - 1;
+      } else {
+        _cart.remove(item.name);
+      }
+      _cartNotifier.value--;
+    }
+  }
+
   void _goToCheckout() {
     final cartItems = <MenuItem, int>{};
     for (var entry in _cart.entries) {
@@ -102,16 +113,36 @@ class _HomeScreenState extends State<HomeScreen> {
                                         style: const TextStyle(color: Colors.grey)),
                                   ],
                                 ),
-                                ElevatedButton.icon(
-                                  onPressed: () => _addToCart(item),
-                                  icon: const Icon(Icons.add),
-                                  label: Text(count == 0 ? 'Add' : 'Add ($count)'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.teal,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                ),
+                                count == 0
+                                    ? ElevatedButton.icon(
+                                        onPressed: () => _addToCart(item),
+                                        icon: const Icon(Icons.add),
+                                        label: const Text('Add'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.teal,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10)),
+                                        ),
+                                      )
+                                    : Row(
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.remove_circle_outline),
+                                            color: Colors.teal.shade800,
+                                            onPressed: () => _removeFromCart(item),
+                                          ),
+                                          Text('$count',
+                                              style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold)),
+                                          IconButton(
+                                            icon: const Icon(Icons.add_circle_outline),
+                                            color: Colors.teal.shade800,
+                                            onPressed: () => _addToCart(item),
+                                          ),
+                                        ],
+                                      ),
                               ],
                             ),
                           ),
