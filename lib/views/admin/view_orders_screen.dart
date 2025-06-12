@@ -10,7 +10,7 @@ class ViewOrdersScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("View Orders")),
       body: StreamBuilder<List<UserOrder>>(
-        stream: DataService().getAllOrders(), // ✅ Use admin stream
+        stream: DataService().getAllOrders(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return const Center(child: Text('❌ Error loading orders.'));
@@ -28,20 +28,34 @@ class ViewOrdersScreen extends StatelessWidget {
             itemCount: orders.length,
             itemBuilder: (context, index) {
               final order = orders[index];
+              final isCompleted = order.status == 'Completed';
+
               return Card(
                 margin: const EdgeInsets.all(8),
                 child: ListTile(
                   title: Text('User: ${order.username} | Token: ${order.token}'),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: order.items.map((e) => Text('${e.name} - ₹${e.price}')).toList(),
+                    children: [
+                      ...order.items.map((e) => Text('${e.name} - ₹${e.price}')),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Status: ${order.status}',
+                        style: TextStyle(
+                          color: isCompleted ? Colors.green : Colors.orange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                  trailing: ElevatedButton(
-                    onPressed: () {
-                      DataService().markOrderAsDone(order.id);
-                    },
-                    child: const Text("Mark Done"),
-                  ),
+                  trailing: isCompleted
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : ElevatedButton(
+                          onPressed: () {
+                            DataService().markOrderAsDone(order.id);
+                          },
+                          child: const Text("Mark Done"),
+                        ),
                 ),
               );
             },

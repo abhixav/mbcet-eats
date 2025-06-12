@@ -10,14 +10,11 @@ class DataService {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// 🔐 Places an order with userId from FirebaseAuth and returns a token
+  /// 🔐 Places an order and sets default status as 'Pending'
   Future<int> placeOrder(String username, List<MenuItem> items) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception("User not logged in");
-    }
+    if (user == null) throw Exception("User not logged in");
 
-    // 🔢 Assign token as order count + 1
     final ordersSnapshot = await _db.collection('orders').get();
     final token = ordersSnapshot.size + 1;
 
@@ -27,18 +24,17 @@ class DataService {
       'token': token,
       'items': items.map((e) => {'name': e.name, 'price': e.price}).toList(),
       'timestamp': Timestamp.now(),
+      'status': 'Pending', // ✅ add status
     };
 
     await _db.collection('orders').add(orderData);
     return token;
   }
 
-  /// 📦 Stream orders (only current user’s orders)
+  /// 📦 User-specific order stream
   Stream<List<UserOrder>> getOrders() {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return const Stream.empty();
-    }
+    if (user == null) return const Stream.empty();
 
     return _db
         .collection('orders')
@@ -47,13 +43,12 @@ class DataService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return UserOrder.fromMap(doc.id, data);
+        return UserOrder.fromMap(doc.id, doc.data());
       }).toList();
     });
   }
 
-  /// ✅ Admin use — get all orders
+  /// 🧾 Admin stream for all orders
   Stream<List<UserOrder>> getAllOrders() {
     return _db
         .collection('orders')
@@ -61,24 +56,22 @@ class DataService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return UserOrder.fromMap(doc.id, data);
+        return UserOrder.fromMap(doc.id, doc.data());
       }).toList();
     });
   }
 
-  /// ✅ Mark order as completed (deletes from Firestore)
+  /// ✅ Mark an order as Completed instead of deleting
   Future<void> markOrderAsDone(String orderId) async {
-    await _db.collection('orders').doc(orderId).delete();
+    await _db.collection('orders').doc(orderId).update({'status': 'Completed'});
   }
 
-  /// 📋 Stream of menu items
+  /// 📋 Menu stream
   Stream<List<MenuItem>> getMenuItems() {
     return _db.collection('menuItems').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
-        final data = doc.data();
         try {
-          return MenuItem.fromMap(data);
+          return MenuItem.fromMap(doc.data());
         } catch (e) {
           print('⚠️ Skipped invalid menu item: ${doc.id}, error: $e');
           return null;
@@ -87,24 +80,21 @@ class DataService {
     });
   }
 
-  /// ✏️ Admin use — update the full menu list
+  /// ✏️ Replace entire menu (admin)
   Future<void> updateMenu(List<MenuItem> items) async {
     final menuRef = _db.collection('menuItems');
     final batch = _db.batch();
 
-    // 🔄 Delete existing menu items
     final oldMenu = await menuRef.get();
     for (final doc in oldMenu.docs) {
       batch.delete(doc.reference);
     }
 
-    // ➕ Add new items
     for (final item in items) {
       final newDoc = menuRef.doc();
       batch.set(newDoc, item.toMap());
     }
 
     await batch.commit();
-    print("✅ Menu updated with ${items.length} items.");
   }
 }
