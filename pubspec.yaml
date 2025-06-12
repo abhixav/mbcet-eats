@@ -15,6 +15,7 @@ dependencies:
   firebase_core: ^2.30.0
   firebase_auth: ^4.17.0
   cloud_firestore: ^4.16.0
+  intl: ^0.19.0  # ✅ Added for formatting timestamps
 
 dev_dependencies:
   flutter_test:

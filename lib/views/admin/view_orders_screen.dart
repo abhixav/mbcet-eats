@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // ✅ For timestamp formatting
 import '../../services/data_service.dart';
 import '../../models/order.dart';
 
@@ -39,6 +40,10 @@ class ViewOrdersScreen extends StatelessWidget {
                     children: [
                       ...order.items.map((e) => Text('${e.name} - ₹${e.price}')),
                       const SizedBox(height: 4),
+                      Text(
+                        'Placed on: ${DateFormat('dd-MM-yyyy hh:mm a').format(order.timestamp)}',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
                       Text(
                         'Status: ${order.status}',
                         style: TextStyle(
