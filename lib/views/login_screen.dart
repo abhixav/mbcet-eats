@@ -20,12 +20,26 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorText;
   bool _isLoading = false;
 
+  bool isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    return emailRegex.hasMatch(email);
+  }
+
+  void _showError(String message) {
+    setState(() => _errorText = message);
+  }
+
   Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorText = 'Please fill in all fields');
+      _showError('Please fill in all fields.');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      _showError('⚠️ Please enter a valid email address.');
       return;
     }
 
@@ -47,17 +61,22 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        if (e.code == 'user-not-found') {
-          _errorText = '❌ No account found for that email.';
-        } else if (e.code == 'wrong-password') {
-          _errorText = '❌ Incorrect password.';
-        } else {
-          _errorText = 'Login failed: ${e.message}';
-        }
-      });
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+        _showError('❌ No account found. Redirecting to Sign Up...');
+        await Future.delayed(const Duration(seconds: 2));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SignupScreen()),
+        );
+      } else if (e.code == 'wrong-password') {
+        _showError('❌ Incorrect password. Please try again.');
+      } else if (e.code == 'invalid-email') {
+        _showError('⚠️ Invalid email format.');
+      } else {
+        _showError('⚠️ Login failed: ${e.message}');
+      }
     } catch (e) {
-      setState(() => _errorText = 'Unexpected error: ${e.toString()}');
+      _showError('Unexpected error: ${e.toString()}');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -176,7 +195,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ElevatedButton.icon(
                 onPressed: _isLoading ? null : _login,
                 icon: const Icon(Icons.login),
-                label: _isLoading ? const CircularProgressIndicator() : const Text('Login'),
+                label: _isLoading
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator())
+                    : const Text('Login'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

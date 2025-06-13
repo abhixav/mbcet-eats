@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/menu_item.dart';
 import '../../services/data_service.dart';
 import 'checkout_screen.dart';
+import 'order_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -46,15 +47,32 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CheckoutScreen(cart: cartItems, userId: widget.userId),
+        builder: (context) =>
+            CheckoutScreen(cart: cartItems, userId: widget.userId),
       ),
+    );
+  }
+
+  void _goToOrderHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('MBCET Eats 🍱')),
+      appBar: AppBar(
+        title: const Text('MBCET Eats 🍱'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Order History',
+            onPressed: _goToOrderHistory,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           const Padding(
@@ -110,7 +128,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                             fontWeight: FontWeight.w600)),
                                     const SizedBox(height: 5),
                                     Text("₹${item.price}",
-                                        style: const TextStyle(color: Colors.grey)),
+                                        style:
+                                            const TextStyle(color: Colors.grey)),
                                   ],
                                 ),
                                 count == 0
@@ -128,18 +147,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                     : Row(
                                         children: [
                                           IconButton(
-                                            icon: const Icon(Icons.remove_circle_outline),
+                                            icon: const Icon(
+                                                Icons.remove_circle_outline),
                                             color: Colors.teal.shade800,
-                                            onPressed: () => _removeFromCart(item),
+                                            onPressed: () =>
+                                                _removeFromCart(item),
                                           ),
                                           Text('$count',
                                               style: const TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.bold)),
                                           IconButton(
-                                            icon: const Icon(Icons.add_circle_outline),
+                                            icon: const Icon(
+                                                Icons.add_circle_outline),
                                             color: Colors.teal.shade800,
-                                            onPressed: () => _addToCart(item),
+                                            onPressed: () =>
+                                                _addToCart(item),
                                           ),
                                         ],
                                       ),
