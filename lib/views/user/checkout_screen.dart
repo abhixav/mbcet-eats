@@ -3,6 +3,7 @@ import '../../models/menu_item.dart';
 import '../../services/data_service.dart';
 import '../order_confirmation_screen.dart';
 import '../../constants/colors.dart';
+import 'dart:async';
 
 class CheckoutScreen extends StatefulWidget {
   final Map<MenuItem, int> cart;
@@ -16,11 +17,49 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   late Map<MenuItem, int> cart;
+  Timer? _timer;
+  Duration timeLeft = Duration.zero;
+
+  final DateTime _startTime = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+    8,
+    0,
+  );
+  final DateTime _endTime = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+    13,
+    35,
+  );
 
   @override
   void initState() {
     super.initState();
     cart = Map.from(widget.cart);
+    _updateTimeLeft();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTimeLeft());
+  }
+
+  void _updateTimeLeft() {
+    final now = DateTime.now();
+    setState(() {
+      if (now.isBefore(_startTime)) {
+        timeLeft = _startTime.difference(now);
+      } else if (now.isAfter(_endTime)) {
+        timeLeft = Duration.zero;
+      } else {
+        timeLeft = _endTime.difference(now);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   void _increaseQty(MenuItem item) {
@@ -41,6 +80,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   double get total {
     return cart.entries.fold(0, (sum, item) => sum + (item.key.price * item.value));
+  }
+
+  bool get isOrderingTime {
+    final now = DateTime.now();
+    return now.isAfter(_startTime) && now.isBefore(_endTime);
   }
 
   @override
@@ -64,6 +108,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const Text(
               "Your Cart",
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isOrderingTime
+                  ? "⏰ Time left to order: ${timeLeft.inMinutes.remainder(60).toString().padLeft(2, '0')}:${(timeLeft.inSeconds.remainder(60)).toString().padLeft(2, '0')}"
+                  : "⚠️ Ordering is closed. Available between 8:00 AM and 1:35 PM.",
+              style: TextStyle(
+                color: isOrderingTime ? Colors.green : Colors.red,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 16),
             if (items.isEmpty)
@@ -163,6 +217,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               onPressed: cart.isEmpty
                   ? null
                   : () async {
+                      if (!isOrderingTime) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text("Ordering is allowed only between 8:00 AM and 1:35 PM."),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
                       final token = await DataService().placeOrder(
                         cart.entries.expand((e) => List.filled(e.value, e.key)).toList(),
                       );
