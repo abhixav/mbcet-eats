@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'admin/admin_home_screen.dart';
 import 'user/home_screen.dart';
 import 'user/signup_screen.dart';
+import 'admin/admin_login_screen.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,9 +16,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _adminUserController = TextEditingController();
-  final TextEditingController _adminPassController = TextEditingController();
-
   String? _errorText;
   bool _isLoading = false;
 
@@ -61,10 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+      if (e.code == 'user-not-found') {
         _showError('❌ No account found. Redirecting to Sign Up...');
         await Future.delayed(const Duration(seconds: 2));
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const SignupScreen()),
         );
@@ -82,72 +81,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _adminLoginDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Admin Login'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _adminUserController,
-              decoration: const InputDecoration(
-                labelText: 'Username',
-                prefixIcon: Icon(Icons.person),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _adminPassController,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                prefixIcon: Icon(Icons.lock),
-              ),
-              obscureText: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: _adminLogin,
-            child: const Text('Login'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _adminLogin() {
-    final username = _adminUserController.text.trim();
-    final password = _adminPassController.text;
-
-    if (username == 'admin' && password == 'admin123') {
-      Navigator.pop(context);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
-      );
-    } else {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ Invalid admin username or password'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
   void _goToSignup() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const SignupScreen()),
+    );
+  }
+
+  void _goToAdminLogin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
     );
   }
 
@@ -205,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 12),
               ElevatedButton.icon(
-                onPressed: _adminLoginDialog,
+                onPressed: _goToAdminLogin,
                 icon: const Icon(Icons.admin_panel_settings),
                 label: const Text('Admin Login'),
                 style: ElevatedButton.styleFrom(

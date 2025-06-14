@@ -30,6 +30,7 @@ class UserOrder {
       status: map['status'] ?? 'Pending',
       items: (map['items'] as List).map((item) {
         return MenuItem(
+          id: '', // Orders don't store menu item ID in Firestore
           name: item['name'],
           price: item['price'],
         );

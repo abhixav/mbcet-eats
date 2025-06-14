@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       debugShowCheckedModeBanner: false,
-      home: const LaunchScreen(),
+      home: const LaunchScreen(), // 👈 You can redirect to AdminLogin or UserHome from here
     );
   }
 }

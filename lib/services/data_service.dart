@@ -10,7 +10,37 @@ class DataService {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// 🔐 Places an order and sets default status as 'Pending'
+  // ------------------ MENU ------------------
+
+  Stream<List<MenuItem>> getMenuItems() {
+    return _db.collection('menuItems').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return MenuItem.fromFirestore(doc);
+      }).toList();
+    });
+  }
+
+  Future<void> updateMenu(List<MenuItem> newItems) async {
+    final menuRef = _db.collection('menuItems');
+    final existingSnapshot = await menuRef.get();
+    final batch = _db.batch();
+
+    // Delete old menu
+    for (var doc in existingSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // Add new menu
+    for (var item in newItems) {
+      final docRef = menuRef.doc(); // Auto-generated ID
+      batch.set(docRef, item.toMap());
+    }
+
+    await batch.commit();
+  }
+
+  // ------------------ ORDERS ------------------
+
   Future<int> placeOrder(List<MenuItem> items) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("User not logged in");
@@ -34,7 +64,6 @@ class DataService {
     return token;
   }
 
-  /// 📦 User-specific order stream
   Stream<List<UserOrder>> getOrders() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Stream.empty();
@@ -51,7 +80,6 @@ class DataService {
     });
   }
 
-  /// 🧾 Admin stream for all orders
   Stream<List<UserOrder>> getAllOrders() {
     return _db
         .collection('orders')
@@ -64,44 +92,12 @@ class DataService {
     });
   }
 
-  /// ✅ Mark an order as Completed instead of deleting
   Future<void> markOrderAsDone(String orderId) async {
     await _db.collection('orders').doc(orderId).update({'status': 'Completed'});
   }
 
-  /// 📋 Menu stream
-  Stream<List<MenuItem>> getMenuItems() {
-    return _db.collection('menuItems').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        try {
-          return MenuItem.fromMap(doc.data());
-        } catch (e) {
-          print('⚠️ Skipped invalid menu item: ${doc.id}, error: $e');
-          return null;
-        }
-      }).whereType<MenuItem>().toList();
-    });
-  }
+  // ------------------ HELPER ------------------
 
-  /// ✏️ Replace entire menu (admin)
-  Future<void> updateMenu(List<MenuItem> items) async {
-    final menuRef = _db.collection('menuItems');
-    final batch = _db.batch();
-
-    final oldMenu = await menuRef.get();
-    for (final doc in oldMenu.docs) {
-      batch.delete(doc.reference);
-    }
-
-    for (final item in items) {
-      final newDoc = menuRef.doc();
-      batch.set(newDoc, item.toMap());
-    }
-
-    await batch.commit();
-  }
-
-  /// 👤 Extract nice name from email
   String _extractNameFromEmail(String email) {
     final localPart = email.split('@').first;
     final parts = localPart.split('.');

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../../models/menu_item.dart';
 import '../../services/data_service.dart';
 
@@ -39,7 +40,11 @@ class _EditMenuScreenState extends State<EditMenuScreen> {
       return;
     }
 
-    final newItem = MenuItem(name: name, price: price);
+    final id = editingIndex != null
+        ? items[editingIndex!].id
+        : const Uuid().v4();
+
+    final newItem = MenuItem(id: id, name: name, price: price);
 
     setState(() {
       if (editingIndex != null) {
