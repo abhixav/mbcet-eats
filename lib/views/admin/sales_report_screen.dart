@@ -1,54 +1,91 @@
 import 'dart:convert';
 import 'dart:html' as html;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
-class SalesReportScreen extends StatelessWidget {
+class SalesReportScreen extends StatefulWidget {
   const SalesReportScreen({super.key});
 
-  Stream<QuerySnapshot> _getTodayOrders() {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+  @override
+  State<SalesReportScreen> createState() => _SalesReportScreenState();
+}
 
-    return FirebaseFirestore.instance
+class _SalesReportScreenState extends State<SalesReportScreen> {
+  DateTime? _selectedDate;
+  DateTimeRange? _selectedDateRange;
+  String? _selectedMonth; // Format: "MM-yyyy"
+
+  final List<String> _months = List.generate(
+    12,
+    (index) => DateFormat('MM-yyyy').format(DateTime(DateTime.now().year, index + 1)),
+  );
+
+  Future<List<QueryDocumentSnapshot>> _getFilteredOrders() async {
+    final now = DateTime.now();
+    DateTime start;
+    DateTime end;
+
+    if (_selectedDate != null) {
+      start = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
+      end = start.add(const Duration(days: 1));
+    } else if (_selectedDateRange != null) {
+      start = _selectedDateRange!.start;
+      end = _selectedDateRange!.end.add(const Duration(days: 1));
+    } else if (_selectedMonth != null) {
+      final parts = _selectedMonth!.split('-');
+      final month = int.parse(parts[0]);
+      final year = int.parse(parts[1]);
+      start = DateTime(year, month);
+      end = DateTime(year, month + 1);
+    } else {
+      start = DateTime(now.year, now.month, now.day);
+      end = start.add(const Duration(days: 1));
+    }
+
+    final snapshot = await FirebaseFirestore.instance
         .collection('orders')
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .where('timestamp', isLessThan: Timestamp.fromDate(endOfDay))
-        .snapshots();
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('timestamp', isLessThan: Timestamp.fromDate(end))
+        .orderBy('timestamp', descending: true)
+        .get();
+
+    return snapshot.docs;
   }
 
-  double _calculateTotalSales(QuerySnapshot snapshot) {
+  double _calculateTotalSales(List<QueryDocumentSnapshot> docs) {
     double total = 0.0;
-    for (var doc in snapshot.docs) {
+    for (var doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
       final items = List<Map<String, dynamic>>.from(data['items']);
       for (var item in items) {
-        final price = (item['price'] ?? 0).toDouble();
-        total += price;
+        total += (item['price'] ?? 0).toDouble();
       }
     }
     return total;
   }
 
-  void _downloadCSVWeb(QuerySnapshot snapshot) {
+  void _downloadCSV(List<QueryDocumentSnapshot> docs) {
     List<List<String>> rows = [
-      ['Order No.', 'Items', 'Total Price']
+      ['Order No.', 'Order Date', 'Items', 'Total Price']
     ];
 
     int orderNo = 1;
     double totalSales = 0.0;
 
-    for (var doc in snapshot.docs) {
+    for (var doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
       final items = List<Map<String, dynamic>>.from(data['items']);
-
       final itemNames = items.map((item) => item['name'].toString()).join(', ');
       final orderTotal = items.fold(0.0, (sum, item) => sum + (item['price'] ?? 0).toDouble());
 
+      final timestamp = (data['timestamp'] as Timestamp).toDate();
+      final orderTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(timestamp);
+
       rows.add([
         'Order $orderNo',
+        orderTime,
         itemNames,
         orderTotal.toStringAsFixed(2),
       ]);
@@ -58,7 +95,7 @@ class SalesReportScreen extends StatelessWidget {
     }
 
     rows.add([]);
-    rows.add(['', 'Total Sales', totalSales.toStringAsFixed(2)]);
+    rows.add(['', '', 'Total Sales', totalSales.toStringAsFixed(2)]);
 
     final csv = const ListToCsvConverter().convert(rows);
     final bytes = utf8.encode(csv);
@@ -70,82 +107,149 @@ class SalesReportScreen extends StatelessWidget {
     html.Url.revokeObjectUrl(url);
   }
 
+  Widget _buildFilterButtons() {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        ElevatedButton.icon(
+          icon: const Icon(Icons.calendar_today),
+          label: const Text("Pick Date"),
+          onPressed: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: DateTime.now(),
+              firstDate: DateTime(2024),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null) {
+              setState(() {
+                _selectedDate = picked;
+                _selectedDateRange = null;
+                _selectedMonth = null;
+              });
+            }
+          },
+        ),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.date_range),
+          label: const Text("Date Range"),
+          onPressed: () async {
+            final picked = await showDateRangePicker(
+              context: context,
+              firstDate: DateTime(2024),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null) {
+              setState(() {
+                _selectedDateRange = picked;
+                _selectedDate = null;
+                _selectedMonth = null;
+              });
+            }
+          },
+        ),
+        DropdownButton<String>(
+          hint: const Text("Select Month"),
+          value: _selectedMonth,
+          items: _months.map((month) {
+            return DropdownMenuItem(
+              value: month,
+              child: Text(DateFormat('MMMM yyyy').format(DateFormat('MM-yyyy').parse(month))),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedMonth = value;
+              _selectedDate = null;
+              _selectedDateRange = null;
+            });
+          },
+        ),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.clear),
+          label: const Text("Reset"),
+          onPressed: () {
+            setState(() {
+              _selectedDate = null;
+              _selectedDateRange = null;
+              _selectedMonth = null;
+            });
+          },
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Today's Sales Report"),
+        title: const Text("Sales Report"),
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
             onPressed: () async {
-              final snapshot = await FirebaseFirestore.instance
-                  .collection('orders')
-                  .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(
-                      DateTime.now().subtract(const Duration(hours: 24))))
-                  .get();
-
-              _downloadCSVWeb(snapshot);
+              final docs = await _getFilteredOrders();
+              _downloadCSV(docs);
             },
-          )
+          ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _getTodayOrders(),
+      body: FutureBuilder<List<QueryDocumentSnapshot>>(
+        future: _getFilteredOrders(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No orders placed today.'));
+          final docs = snapshot.data ?? [];
+
+          if (docs.isEmpty) {
+            return const Center(child: Text("No orders found for selected filter."));
           }
 
-          final orders = snapshot.data!;
-          final totalSales = _calculateTotalSales(orders);
+          final totalSales = _calculateTotalSales(docs);
 
           return Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildFilterButtons(),
+                const SizedBox(height: 20),
                 Text(
-                  'Total Orders: ${orders.docs.length}',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  'Total Orders: ${docs.length}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 10),
                 Text(
                   'Total Sales: ₹${totalSales.toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Divider(height: 30),
-                const Text(
-                  'Order Details',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 10),
                 Expanded(
                   child: ListView.builder(
-                    itemCount: orders.docs.length,
+                    itemCount: docs.length,
                     itemBuilder: (context, index) {
-                      final data = orders.docs[index].data() as Map<String, dynamic>;
-                      final items = List<Map<String, dynamic>>.from(data['items'] ?? []);
-                      final orderTotal = items.fold(0.0, (sum, item) {
-                        final price = (item['price'] ?? 0).toDouble();
-                        return sum + price;
-                      });
+                      final data = docs[index].data() as Map<String, dynamic>;
+                      final items = List<Map<String, dynamic>>.from(data['items']);
+                      final orderTotal = items.fold(0.0, (sum, item) => sum + (item['price'] ?? 0).toDouble());
+
+                      final timestamp = (data['timestamp'] as Timestamp).toDate();
+                      final formattedDate = DateFormat('yyyy-MM-dd – hh:mm a').format(timestamp);
 
                       return Card(
-                        elevation: 3,
+                        elevation: 2,
                         margin: const EdgeInsets.symmetric(vertical: 8),
                         child: ListTile(
                           title: Text('Order ${index + 1}'),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: items
-                                .where((item) => item['name'] != null && item['price'] != null)
-                                .map((item) => Text('${item['name']} - ₹${item['price']}'))
-                                .toList(),
+                            children: [
+                              Text('Date: $formattedDate', style: const TextStyle(fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 5),
+                              ...items.map((item) => Text('${item['name']} - ₹${item['price']}')).toList(),
+                            ],
                           ),
                           trailing: Text(
                             '₹${orderTotal.toStringAsFixed(2)}',
