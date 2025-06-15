@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:html' as html;
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -20,25 +23,73 @@ class SalesReportScreen extends StatelessWidget {
     double total = 0.0;
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
-      if (data.containsKey('totalPrice')) {
-        total += (data['totalPrice'] as num).toDouble();
-      } else if (data.containsKey('items')) {
-        final items = List<Map<String, dynamic>>.from(data['items']);
-        for (var item in items) {
-          final price = (item['price'] ?? 0);
-          if (price is num) {
-            total += price.toDouble();
-          }
-        }
+      final items = List<Map<String, dynamic>>.from(data['items']);
+      for (var item in items) {
+        final price = (item['price'] ?? 0).toDouble();
+        total += price;
       }
     }
     return total;
   }
 
+  void _downloadCSVWeb(QuerySnapshot snapshot) {
+    List<List<String>> rows = [
+      ['Order No.', 'Items', 'Total Price']
+    ];
+
+    int orderNo = 1;
+    double totalSales = 0.0;
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final items = List<Map<String, dynamic>>.from(data['items']);
+
+      final itemNames = items.map((item) => item['name'].toString()).join(', ');
+      final orderTotal = items.fold(0.0, (sum, item) => sum + (item['price'] ?? 0).toDouble());
+
+      rows.add([
+        'Order $orderNo',
+        itemNames,
+        orderTotal.toStringAsFixed(2),
+      ]);
+
+      totalSales += orderTotal;
+      orderNo++;
+    }
+
+    rows.add([]);
+    rows.add(['', 'Total Sales', totalSales.toStringAsFixed(2)]);
+
+    final csv = const ListToCsvConverter().convert(rows);
+    final bytes = utf8.encode(csv);
+    final blob = html.Blob([bytes]);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute("download", "sales_report.csv")
+      ..click();
+    html.Url.revokeObjectUrl(url);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Today's Sales Report")),
+      appBar: AppBar(
+        title: const Text("Today's Sales Report"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: () async {
+              final snapshot = await FirebaseFirestore.instance
+                  .collection('orders')
+                  .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(
+                      DateTime.now().subtract(const Duration(hours: 24))))
+                  .get();
+
+              _downloadCSVWeb(snapshot);
+            },
+          )
+        ],
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _getTodayOrders(),
         builder: (context, snapshot) {
@@ -79,15 +130,9 @@ class SalesReportScreen extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final data = orders.docs[index].data() as Map<String, dynamic>;
                       final items = List<Map<String, dynamic>>.from(data['items'] ?? []);
-
-                      final validItems = items.where((item) =>
-                          item['name'] != null &&
-                          item['name'].toString().trim().isNotEmpty &&
-                          item['price'] != null &&
-                          item['price'] is num);
-
-                      final orderTotal = validItems.fold(0.0, (sum, item) {
-                        return sum + (item['price'] as num).toDouble();
+                      final orderTotal = items.fold(0.0, (sum, item) {
+                        final price = (item['price'] ?? 0).toDouble();
+                        return sum + price;
                       });
 
                       return Card(
@@ -95,14 +140,13 @@ class SalesReportScreen extends StatelessWidget {
                         margin: const EdgeInsets.symmetric(vertical: 8),
                         child: ListTile(
                           title: Text('Order ${index + 1}'),
-                          subtitle: validItems.isNotEmpty
-                              ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: validItems.map((item) {
-                                    return Text('${item['name']} - ₹${item['price']}');
-                                  }).toList(),
-                                )
-                              : const Text('No valid items'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: items
+                                .where((item) => item['name'] != null && item['price'] != null)
+                                .map((item) => Text('${item['name']} - ₹${item['price']}'))
+                                .toList(),
+                          ),
                           trailing: Text(
                             '₹${orderTotal.toStringAsFixed(2)}',
                             style: const TextStyle(fontWeight: FontWeight.bold),
