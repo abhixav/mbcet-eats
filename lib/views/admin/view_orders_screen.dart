@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/data_service.dart';
 import '../../models/order.dart';
-import '../../constants/colors.dart'; // Your app color constants
+import '../../constants/colors.dart';
 
 class ViewOrdersScreen extends StatelessWidget {
   const ViewOrdersScreen({super.key});
@@ -10,7 +10,7 @@ class ViewOrdersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundGrey,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text("Admin - View Orders"),
         backgroundColor: AppColors.primary,
@@ -33,10 +33,10 @@ class ViewOrdersScreen extends StatelessWidget {
             return const Center(child: Text('🛒 No orders placed yet.'));
           }
 
-          // Group orders by date
+          // Group orders by scheduled delivery date
           final Map<String, List<UserOrder>> groupedOrders = {};
           for (var order in orders) {
-            final dateKey = DateFormat('dd MMM yyyy').format(order.timestamp);
+            final dateKey = DateFormat('dd MMM yyyy').format(order.scheduledFor);
             groupedOrders.putIfAbsent(dateKey, () => []).add(order);
           }
 
@@ -49,7 +49,7 @@ class ViewOrdersScreen extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Text(
-                      "📅 ${entry.key}",
+                      "📅 Delivery Date: ${entry.key}",
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -125,7 +125,7 @@ class ViewOrdersScreen extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  DateFormat('hh:mm a').format(order.timestamp),
+                                  "Placed: ${DateFormat('hh:mm a').format(order.timestamp)}",
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey,
@@ -193,9 +193,11 @@ class ViewOrdersScreen extends StatelessWidget {
   }
 
   String _formatName(String username) {
-    final parts = username.trim().split(RegExp(r'[\s._]'));
-    if (parts.isEmpty) return 'User';
-    return _capitalize(parts[0]); // Only show the first word, capitalized
+    final parts = username.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${_capitalize(parts[0])} ${_capitalize(parts[1])}';
+    }
+    return _capitalize(parts[0]);
   }
 
   String _capitalize(String s) {

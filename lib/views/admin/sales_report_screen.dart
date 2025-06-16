@@ -15,7 +15,7 @@ class SalesReportScreen extends StatefulWidget {
 class _SalesReportScreenState extends State<SalesReportScreen> {
   DateTime? _selectedDate;
   DateTimeRange? _selectedDateRange;
-  String? _selectedMonth; // Format: "MM-yyyy"
+  String? _selectedMonth;
 
   final List<String> _months = List.generate(
     12,
@@ -31,8 +31,9 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       start = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
       end = start.add(const Duration(days: 1));
     } else if (_selectedDateRange != null) {
-      start = _selectedDateRange!.start;
-      end = _selectedDateRange!.end.add(const Duration(days: 1));
+      start = DateTime(_selectedDateRange!.start.year, _selectedDateRange!.start.month, _selectedDateRange!.start.day);
+      end = DateTime(_selectedDateRange!.end.year, _selectedDateRange!.end.month, _selectedDateRange!.end.day)
+          .add(const Duration(days: 1));
     } else if (_selectedMonth != null) {
       final parts = _selectedMonth!.split('-');
       final month = int.parse(parts[0]);
@@ -44,14 +45,24 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       end = start.add(const Duration(days: 1));
     }
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('orders')
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('timestamp', isLessThan: Timestamp.fromDate(end))
-        .orderBy('timestamp', descending: true)
-        .get();
+    final snapshot = await FirebaseFirestore.instance.collection('orders').get();
 
-    return snapshot.docs;
+    final filtered = snapshot.docs.where((doc) {
+      final data = doc.data();
+      final timestamp = (data['scheduledFor'] ?? data['timestamp']) as Timestamp?;
+      if (timestamp == null) return false;
+      final date = timestamp.toDate();
+      return date.isAfter(start.subtract(const Duration(seconds: 1))) &&
+          date.isBefore(end);
+    }).toList();
+
+    filtered.sort((a, b) {
+      final aDate = ((a.data()['scheduledFor'] ?? a.data()['timestamp']) as Timestamp).toDate();
+      final bDate = ((b.data()['scheduledFor'] ?? b.data()['timestamp']) as Timestamp).toDate();
+      return bDate.compareTo(aDate);
+    });
+
+    return filtered;
   }
 
   double _calculateTotalSales(List<QueryDocumentSnapshot> docs) {
@@ -68,7 +79,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
 
   void _downloadCSV(List<QueryDocumentSnapshot> docs) {
     List<List<String>> rows = [
-      ['Order No.', 'Order Date', 'Items', 'Total Price']
+      ['Order No.', 'Delivery Date', 'Items', 'Total Price']
     ];
 
     int orderNo = 1;
@@ -80,12 +91,12 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       final itemNames = items.map((item) => item['name'].toString()).join(', ');
       final orderTotal = items.fold(0.0, (sum, item) => sum + (item['price'] ?? 0).toDouble());
 
-      final timestamp = (data['timestamp'] as Timestamp).toDate();
-      final orderTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(timestamp);
+      final scheduled = (data['scheduledFor'] ?? data['timestamp']) as Timestamp;
+      final scheduledDateStr = DateFormat('yyyy-MM-dd').format(scheduled.toDate());
 
       rows.add([
         'Order $orderNo',
-        orderTime,
+        scheduledDateStr,
         itemNames,
         orderTotal.toStringAsFixed(2),
       ]);
@@ -120,7 +131,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
               context: context,
               initialDate: DateTime.now(),
               firstDate: DateTime(2024),
-              lastDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 30)), // Allow future
             );
             if (picked != null) {
               setState(() {
@@ -138,7 +149,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
             final picked = await showDateRangePicker(
               context: context,
               firstDate: DateTime(2024),
-              lastDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 30)),
             );
             if (picked != null) {
               setState(() {
@@ -235,8 +246,8 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                       final items = List<Map<String, dynamic>>.from(data['items']);
                       final orderTotal = items.fold(0.0, (sum, item) => sum + (item['price'] ?? 0).toDouble());
 
-                      final timestamp = (data['timestamp'] as Timestamp).toDate();
-                      final formattedDate = DateFormat('yyyy-MM-dd – hh:mm a').format(timestamp);
+                      final scheduledDate = ((data['scheduledFor'] ?? data['timestamp']) as Timestamp).toDate();
+                      final formattedDate = DateFormat('yyyy-MM-dd – hh:mm a').format(scheduledDate);
 
                       return Card(
                         elevation: 2,
@@ -246,7 +257,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Date: $formattedDate', style: const TextStyle(fontWeight: FontWeight.w500)),
+                              Text('Delivery Date: $formattedDate', style: const TextStyle(fontWeight: FontWeight.w500)),
                               const SizedBox(height: 5),
                               ...items.map((item) => Text('${item['name']} - ₹${item['price']}')).toList(),
                             ],
