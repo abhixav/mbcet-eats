@@ -41,6 +41,17 @@ class DataService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("User not logged in");
 
+    final now = DateTime.now();
+    final isToday = scheduledDate.year == now.year &&
+                    scheduledDate.month == now.month &&
+                    scheduledDate.day == now.day;
+
+    final cutoffTime = DateTime(now.year, now.month, now.day, 13, 35); // 1:35 PM
+
+    if (isToday && now.isAfter(cutoffTime)) {
+      throw Exception("⚠️ Ordering for today is closed after 1:35 PM. Please choose another day.");
+    }
+
     final scheduledDateOnly = DateTime(scheduledDate.year, scheduledDate.month, scheduledDate.day);
     final scheduledDateString = "${scheduledDate.year}-${scheduledDate.month}-${scheduledDate.day}";
 
@@ -48,7 +59,6 @@ class DataService {
     final snapshot = await settingsRef.get();
 
     int newToken = 1;
-
     if (snapshot.exists) {
       final data = snapshot.data()!;
       newToken = (data['lastToken'] ?? 0) + 1;
