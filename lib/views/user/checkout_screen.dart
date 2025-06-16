@@ -17,49 +17,12 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   late Map<MenuItem, int> cart;
-  Timer? _timer;
-  Duration timeLeft = Duration.zero;
-
-  final DateTime _startTime = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-    DateTime.now().day,
-    8,
-    0,
-  );
-  final DateTime _endTime = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-    DateTime.now().day,
-    13,
-    35,
-  );
+  DateTime _scheduledDate = DateTime.now(); // 🆕 Default to today
 
   @override
   void initState() {
     super.initState();
     cart = Map.from(widget.cart);
-    _updateTimeLeft();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTimeLeft());
-  }
-
-  void _updateTimeLeft() {
-    final now = DateTime.now();
-    setState(() {
-      if (now.isBefore(_startTime)) {
-        timeLeft = _startTime.difference(now);
-      } else if (now.isAfter(_endTime)) {
-        timeLeft = Duration.zero;
-      } else {
-        timeLeft = _endTime.difference(now);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
   }
 
   void _increaseQty(MenuItem item) {
@@ -73,7 +36,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if ((cart[item] ?? 1) > 1) {
         cart[item] = cart[item]! - 1;
       } else {
-        cart.remove(item); // 🧹 Remove item if quantity becomes 0
+        cart.remove(item);
       }
     });
   }
@@ -82,9 +45,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return cart.entries.fold(0, (sum, item) => sum + (item.key.price * item.value));
   }
 
-  bool get isOrderingTime {
-    final now = DateTime.now();
-    return now.isAfter(_startTime) && now.isBefore(_endTime);
+  Future<void> _pickDate(BuildContext context) async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 7)),
+    );
+
+    if (selected != null) {
+      setState(() => _scheduledDate = selected);
+    }
   }
 
   @override
@@ -94,10 +65,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          "Checkout",
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text("Checkout", style: TextStyle(color: Colors.white)),
         backgroundColor: AppColors.primary,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -105,28 +73,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const Text(
-              "Your Cart",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
+            const Text("Your Cart", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(
-              isOrderingTime
-                  ? "⏰ Time left to order: ${timeLeft.inMinutes.remainder(60).toString().padLeft(2, '0')}:${(timeLeft.inSeconds.remainder(60)).toString().padLeft(2, '0')}"
-                  : "⚠️ Ordering is closed. Available between 8:00 AM and 1:35 PM.",
-              style: TextStyle(
-                color: isOrderingTime ? Colors.green : Colors.red,
-                fontWeight: FontWeight.w600,
-              ),
+
+            // 🆕 Schedule Order Section
+            Row(
+              children: [
+                const Icon(Icons.calendar_month, color: Colors.teal),
+                const SizedBox(width: 8),
+                const Text("Scheduled for:"),
+                const SizedBox(width: 8),
+                Text(
+                  "${_scheduledDate.toLocal()}".split(' ')[0],
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => _pickDate(context),
+                  child: const Text("Change Date"),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
             if (items.isEmpty)
               const Expanded(
                 child: Center(
-                  child: Text(
-                    "Your cart is empty.",
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
+                  child: Text("Your cart is empty.", style: TextStyle(fontSize: 18, color: Colors.grey)),
                 ),
               )
             else
@@ -146,28 +119,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             CircleAvatar(
                               radius: 22,
                               backgroundColor: Colors.teal.shade100,
-                              child: Text(
-                                "${entry.value}x",
-                                style: const TextStyle(color: AppColors.primary),
-                              ),
+                              child: Text("${entry.value}x", style: const TextStyle(color: AppColors.primary)),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    entry.key.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                    ),
-                                  ),
+                                  Text(entry.key.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    "₹${entry.key.price} each",
-                                    style: const TextStyle(color: Colors.grey),
-                                  ),
+                                  Text("₹${entry.key.price} each", style: const TextStyle(color: Colors.grey)),
                                 ],
                               ),
                             ),
@@ -198,44 +159,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   },
                 ),
               ),
+
             const Divider(thickness: 1.5),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Total",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  "₹${total.toStringAsFixed(2)}",
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                const Text("Total", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text("₹${total.toStringAsFixed(2)}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 20),
+
             ElevatedButton.icon(
               onPressed: cart.isEmpty
                   ? null
                   : () async {
-                      if (!isOrderingTime) {
+                      try {
+                        final token = await DataService().placeOrder(cart, scheduledDate: _scheduledDate); // 🆕
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderConfirmationScreen(token: token.toString()),
+                          ),
+                        );
+                      } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: const Text("Ordering is allowed only between 8:00 AM and 1:35 PM."),
+                            content: Text("❌ Failed to place order: $e"),
                             backgroundColor: Colors.red,
                           ),
                         );
-                        return;
                       }
-
-                      final token = await DataService().placeOrder(
-                        cart.entries.expand((e) => List.filled(e.value, e.key)).toList(),
-                      );
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => OrderConfirmationScreen(token: token.toString()),
-                        ),
-                      );
                     },
               icon: const Icon(Icons.check_circle),
               label: const Text("Place Order"),

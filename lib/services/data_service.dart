@@ -14,9 +14,7 @@ class DataService {
 
   Stream<List<MenuItem>> getMenuItems() {
     return _db.collection('menuItems').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return MenuItem.fromFirestore(doc);
-      }).toList();
+      return snapshot.docs.map((doc) => MenuItem.fromFirestore(doc)).toList();
     });
   }
 
@@ -25,14 +23,12 @@ class DataService {
     final existingSnapshot = await menuRef.get();
     final batch = _db.batch();
 
-    // Delete old menu
     for (var doc in existingSnapshot.docs) {
       batch.delete(doc.reference);
     }
 
-    // Add new menu
     for (var item in newItems) {
-      final docRef = menuRef.doc(); // Auto-generated ID
+      final docRef = menuRef.doc();
       batch.set(docRef, item.toMap());
     }
 
@@ -41,12 +37,27 @@ class DataService {
 
   // ------------------ ORDERS ------------------
 
-  Future<int> placeOrder(List<MenuItem> items) async {
+  Future<int> placeOrder(Map<MenuItem, int> cart, {required DateTime scheduledDate}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception("User not logged in");
 
-    final ordersSnapshot = await _db.collection('orders').get();
-    final token = ordersSnapshot.size + 1;
+    final scheduledDateOnly = DateTime(scheduledDate.year, scheduledDate.month, scheduledDate.day);
+    final scheduledDateString = "${scheduledDate.year}-${scheduledDate.month}-${scheduledDate.day}";
+
+    final settingsRef = _db.collection('settings').doc('tokenTracker_$scheduledDateString');
+    final snapshot = await settingsRef.get();
+
+    int newToken = 1;
+
+    if (snapshot.exists) {
+      final data = snapshot.data()!;
+      newToken = (data['lastToken'] ?? 0) + 1;
+    }
+
+    await settingsRef.set({
+      'lastToken': newToken,
+      'date': Timestamp.fromDate(scheduledDateOnly),
+    });
 
     final email = user.email ?? '';
     final username = _extractNameFromEmail(email);
@@ -54,14 +65,19 @@ class DataService {
     final orderData = {
       'userId': user.uid,
       'username': username,
-      'token': token,
-      'items': items.map((e) => {'name': e.name, 'price': e.price}).toList(),
+      'token': newToken,
+      'items': cart.entries.map((entry) => {
+        'name': entry.key.name,
+        'price': entry.key.price,
+        'quantity': entry.value,
+      }).toList(),
       'timestamp': Timestamp.now(),
+      'scheduledFor': Timestamp.fromDate(scheduledDateOnly),
       'status': 'Pending',
     };
 
     await _db.collection('orders').add(orderData);
-    return token;
+    return newToken;
   }
 
   Stream<List<UserOrder>> getOrders() {
@@ -96,23 +112,32 @@ class DataService {
     await _db.collection('orders').doc(orderId).update({'status': 'Completed'});
   }
 
+  Future<List<UserOrder>> getTodayOrders() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final snapshot = await _db
+        .collection('orders')
+        .where('scheduledFor', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('scheduledFor', isLessThan: Timestamp.fromDate(endOfDay))
+        .get();
+
+    return snapshot.docs.map((doc) => UserOrder.fromMap(doc.id, doc.data())).toList();
+  }
+
   // ------------------ HELPER ------------------
 
   String _extractNameFromEmail(String email) {
     final localPart = email.split('@').first;
     final parts = localPart.split('.');
-    if (parts.isEmpty) return 'Unknown';
+    if (parts.isEmpty) return 'User';
 
-    final namePart = parts.first;
-    final nameMatches = RegExp(r'[a-zA-Z]+').allMatches(namePart).map((m) => m.group(0) ?? '').toList();
-
-    if (nameMatches.isEmpty) return namePart;
-
-    final first = nameMatches[0];
-    final last = nameMatches.length > 1 ? nameMatches[1][0].toUpperCase() : '';
-
-    return '${_capitalize(first)} $last';
+    final first = parts[0];
+    return _capitalize(first); // Only return the first part
   }
 
-  String _capitalize(String str) => str.isEmpty ? str : '${str[0].toUpperCase()}${str.substring(1).toLowerCase()}';
+  String _capitalize(String str) {
+    return str.isEmpty ? str : '${str[0].toUpperCase()}${str.substring(1).toLowerCase()}';
+  }
 }

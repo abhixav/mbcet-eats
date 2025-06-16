@@ -9,6 +9,7 @@ class UserOrder {
   final List<MenuItem> items;
   final DateTime timestamp;
   final String status;
+  final DateTime scheduledFor; // ✅ NEW FIELD
 
   UserOrder({
     required this.id,
@@ -18,6 +19,7 @@ class UserOrder {
     required this.items,
     required this.timestamp,
     required this.status,
+    required this.scheduledFor, // ✅ NEW
   });
 
   factory UserOrder.fromMap(String id, Map<String, dynamic> map) {
@@ -27,6 +29,9 @@ class UserOrder {
       username: map['username'] ?? '',
       token: map['token'] ?? 0,
       timestamp: (map['timestamp'] as Timestamp).toDate(),
+      scheduledFor: map['scheduledFor'] != null
+          ? (map['scheduledFor'] as Timestamp).toDate()
+          : (map['timestamp'] as Timestamp).toDate(), // fallback to timestamp
       status: map['status'] ?? 'Pending',
       items: (map['items'] as List).map((item) {
         return MenuItem(

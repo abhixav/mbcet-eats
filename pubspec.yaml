@@ -15,8 +15,12 @@ dependencies:
   firebase_core: ^2.30.0
   firebase_auth: ^4.17.0
   cloud_firestore: ^4.16.0
-  intl: ^0.19.0         # For date formatting
-  uuid: ^4.0.0          # For generating unique IDs
+  intl: ^0.19.0            # For date formatting
+  uuid: ^4.0.0             # For generating unique IDs
+  csv: ^5.0.2              # For exporting data to CSV
+  path_provider: ^2.1.1    # For accessing file system
+  permission_handler: ^11.0.1 # For runtime permissions on Android
+  share_plus: ^7.2.1       # For sharing files
 
 dev_dependencies:
   flutter_test:
